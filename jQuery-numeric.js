@@ -32,19 +32,31 @@
  * @example  $(".numeric").numeric({ decimalPlaces : 2 }); // only allow 2 decimal places
  * @example  $(".numeric").numeric(null, callback); // use default values, pass on the 'callback' function
  *
+ * @example  $(".numeric").numeric({totDigits:2}); //accept 2 digits only
+ * @example  $(".numeric").numeric({totDigits:2, callbackWhen:'success'}); //accept 2 digits only and
+ *     the callback function is executed if there are no errors.
+ *     possible values for callbackWhen are.... 
+ *     failed - default
+ *     success
+ *     always
  */
 $.fn.numeric = function(config, callback)
 {
 	if(typeof config === 'boolean')
 	{
-		config = { decimal: config, negative: true, decimalPlaces: -1 };
+		config = { decimal: config, negative: true, decimalPlaces: -1, callbackWhen:'failed' };
 	}
 	config = config || {};
     
     //Added by ravin...
-    if( typeof config.totDigits == "undefined" )   config.totDigits = 2;
+    //if number of digits is undefined then allowing n number of digits..
+    if( typeof config.totDigits == "undefined" )   config.totDigits = '';
     var totDigits = config.totDigits;
     
+    //added by ravin.
+    //if callbackWhen is undefined then the callback function will be executed when the input validation failed...
+    if(typeof config.callbackWhen == "undefined") { config.callbackWhen = 'failed'; }
+    var callbackWhen = config.callbackWhen;
     
 	// if config.negative undefined, set to true (default is to allow negative numbers)
 	if(typeof config.negative == "undefined") { config.negative = true; }
@@ -59,7 +71,7 @@ $.fn.numeric = function(config, callback)
 	// callback function
 	callback = (typeof(callback) == "function" ? callback : function() {});
 	// set data and methods
-	return this.data("numeric.totDigits", totDigits).data("numeric.decimal", decimal).data("numeric.altDecimal", altDecimal).data("numeric.negative", negative).data("numeric.callback", callback).data("numeric.decimalPlaces", decimalPlaces).keypress($.fn.numeric.keypress).keyup($.fn.numeric.keyup).blur($.fn.numeric.blur);
+	return this.data("numeric.totDigits", totDigits).data("numeric.callbackWhen", callbackWhen).data("numeric.decimal", decimal).data("numeric.altDecimal", altDecimal).data("numeric.negative", negative).data("numeric.callback", callback).data("numeric.decimalPlaces", decimalPlaces).keypress($.fn.numeric.keypress).keyup($.fn.numeric.keyup).blur($.fn.numeric.blur);
 };
 
 $.fn.numeric.keypress = function(e)
@@ -78,22 +90,15 @@ $.fn.numeric.keypress = function(e)
     //get the total number of digits allowed...
     var totDigits = $.data(this, "numeric.totDigits"); 
     var thisVal = $(this).val();
+    var thisValLength = thisVal.match(/\d+/);
     
-	if(key == 13 && this.nodeName.toLowerCase() == "input")
-	{
-		return true;
-	}
-	else if(key == 13)
-	{
-		return false;
-	}
+	if(key == 13 && this.nodeName.toLowerCase() == "input")    return true;
+	else if(key == 13) return false;
 	//dont allow #, $, %
-	else if(key == 35 || key == 36 || key == 37){
-		return false;
-	} else if ( thisVal && thisVal.length > totDigits-1 ){
-        //added by ravin
+	else if(key == 35 || key == 36 || key == 37)   return false;
+    //added by ravin
+	else if ( totDigits != '' && thisVal && thisValLength.toString().length > totDigits-1 )
         return false;
-    }
 
 	var allow = false;
 	// allow Ctrl+A
@@ -180,6 +185,15 @@ $.fn.numeric.keypress = function(e)
         }
 
 	}
+    
+    //added by ravin...
+    var callback = $.data(this, "numeric.callback");
+    var callbackWhen = $.data(this, "numeric.callbackWhen");
+    
+    if( allow == true && callbackWhen == 'success' )    callback.apply(this);
+    else if( allow == false && callbackWhen == 'failed' )    callback.apply(this);
+    else if( callbackWhen == 'always' )    callback.apply(this);
+    
 	return allow;
 };
 
@@ -208,14 +222,14 @@ $.fn.numeric.keyup = function(e)
 			{
 				this.value = "0" + val;
 				carat++;
-            			selectionEnd++;
+				selectionEnd++;
 			}
 			// if dot at position 1, check if there is a - symbol before it
 			if(dot == 1 && val.charAt(0) == "-")
 			{
 				this.value = "-0" + val.substring(1);
 				carat++;
-            			selectionEnd++;
+				selectionEnd++;
 			}
 			val = this.value;
 		}
